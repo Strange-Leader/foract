@@ -1,0 +1,1259 @@
+================ PROJECT STRUCTURE ================
+.
+├── config
+│   └── default.yaml
+├── CONTRIBUTING.md
+├── docs
+├── examples
+│   └── schema_validation.py
+├── LICENSE
+├── logs
+│   └── foract.log
+├── phase0_review.txt
+├── pyproject.toml
+├── README.md
+├── src
+│   └── foract
+│       ├── config
+│       │   ├── __init__.py
+│       │   ├── loader.py
+│       │   └── settings.py
+│       ├── enums
+│       │   ├── __init__.py
+│       │   ├── logging.py
+│       │   ├── plugin.py
+│       │   └── schema.py
+│       ├── exceptions
+│       │   ├── base.py
+│       │   └── __init__.py
+│       ├── __init__.py
+│       ├── log
+│       │   ├── __init__.py
+│       │   └── logger.py
+│       ├── models
+│       │   ├── __init__.py
+│       │   ├── node.py
+│       │   ├── plugin.py
+│       │   ├── result.py
+│       │   └── schema.py
+│       ├── py.typed
+│       ├── registry
+│       │   ├── base.py
+│       │   ├── __init__.py
+│       │   ├── plugin.py
+│       │   └── schema.py
+│       └── schema
+│           ├── builtin.py
+│           ├── definition.py
+│           ├── field.py
+│           ├── __init__.py
+│           ├── registry.py
+│           └── validator.py
+└── tests
+    ├── __init__.py
+    ├── test_builtin_schemas.py
+    ├── test_config.py
+    ├── test_exceptions.py
+    ├── test_field.py
+    ├── test_logging.py
+    ├── test_models.py
+    ├── test_registry.py
+    ├── test_schema_validation.py
+    └── test_validator.py
+
+15 directories, 46 files
+
+================ PYPROJECT ================
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "foract"
+version = "0.1.0"
+description = "Forensic Artifact Correlation and Retrieval Toolkit"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+
+authors = [
+    { name = "Your Name" }
+]
+
+dependencies = [
+    "pydantic>=2.8",
+    "PyYAML>=6.0",
+    "rich>=13.7",
+    "typer>=0.12",
+    "networkx>=3.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-cov>=5.0",
+    "black>=24.4",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+]
+
+[project.urls]
+Homepage = "https://github.com/<your-github-username>/foract"
+Repository = "https://github.com/<your-github-username>/foract"
+Issues = "https://github.com/<your-github-username>/foract/issues"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+foract = ["py.typed"]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+exclude = '''
+/(
+    \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # bugbear
+    "SIM", # simplify
+    "C4",  # comprehensions
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["foract"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra"
+
+[tool.coverage.run]
+source = ["foract"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+ignore_missing_imports = true
+show_error_codes = true
+pretty = true
+
+================ CONFIGS ================
+
+===== config/default.yaml =====
+project:
+  name: FORACT
+  version: "0.1.0"
+  debug: false
+
+logging:
+  level: INFO
+  file: logs/foract.log
+  console: true
+
+registry:
+  auto_discover: true
+  plugin_directory: plugins
+
+================ SOURCE CODE ================
+
+==================================================
+FILE: src/foract/config/__init__.py
+==================================================
+from .loader import load_settings
+from .settings import Settings
+
+__all__ = [
+    "Settings",
+    "load_settings",
+]
+
+==================================================
+FILE: src/foract/config/loader.py
+==================================================
+from functools import cache
+from pathlib import Path
+
+import yaml
+from pydantic import ValidationError as PydanticValidationError
+
+from foract.config.settings import Settings
+from foract.exceptions import ConfigurationError
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_CONFIG = PROJECT_ROOT / "config" / "default.yaml"
+
+
+@cache
+def load_settings(path: str | Path | None = None) -> Settings:
+    """
+    Load and validate the FORACT configuration.
+    """
+    config_path = Path(path) if path else DEFAULT_CONFIG
+
+    try:
+        with config_path.open("r", encoding="utf-8") as file:
+            data = yaml.safe_load(file)
+    except FileNotFoundError as exc:
+        raise ConfigurationError(
+            f"Configuration file not found: {config_path}"
+        ) from exc
+    except yaml.YAMLError as exc:
+        raise ConfigurationError(
+            f"Invalid YAML configuration: {config_path}"
+        ) from exc
+
+    try:
+        return Settings.model_validate(data)
+    except PydanticValidationError as exc:
+        raise ConfigurationError(
+            "Configuration validation failed."
+        ) from exc
+
+
+#using @cache is a reasonable optimization here because configuration is typically loaded once and treated as immutable. The tradeoff is that if you later modify config/default.yaml while the process is still running (for example, in a test or during development), load_settings() will continue returning the cached object until the cache is cleared with:  # noqa: E501
+
+==================================================
+FILE: src/foract/config/settings.py
+==================================================
+from pydantic import BaseModel
+
+from foract.enums import LogLevel
+
+
+class ProjectSettings(BaseModel):
+    name: str
+    version: str
+    debug: bool = False
+
+
+class LoggingSettings(BaseModel):
+    level: LogLevel = LogLevel.INFO
+    file: str
+    console: bool = True
+
+
+class RegistrySettings(BaseModel):
+    auto_discover: bool = True
+    plugin_directory: str
+
+
+class Settings(BaseModel):
+    project: ProjectSettings
+    logging: LoggingSettings
+    registry: RegistrySettings
+
+==================================================
+FILE: src/foract/enums/__init__.py
+==================================================
+from .logging import LogLevel
+from .plugin import PluginStatus, PluginType
+from .schema import SchemaType
+
+__all__ = [
+    "LogLevel",
+    "PluginStatus",
+    "PluginType",
+    "SchemaType",
+]
+
+==================================================
+FILE: src/foract/enums/logging.py
+==================================================
+from enum import StrEnum
+
+
+class LogLevel(StrEnum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+==================================================
+FILE: src/foract/enums/plugin.py
+==================================================
+from enum import StrEnum
+
+
+class PluginStatus(StrEnum):
+    ENABLED = "enabled"
+    DISABLED = "disabled"
+
+
+class PluginType(StrEnum):
+    VOLATILITY = "volatility"
+    NATIVE = "native"
+    EXTERNAL = "external"
+
+==================================================
+FILE: src/foract/enums/schema.py
+==================================================
+from enum import StrEnum
+
+
+class SchemaType(StrEnum):
+    ARTIFACT = "artifact"
+    INTERMEDIATE = "intermediate"
+    RESULT = "result"
+
+==================================================
+FILE: src/foract/exceptions/base.py
+==================================================
+"""
+FORACT exception hierarchy.
+
+Every project-specific exception must inherit from FORACTError.
+"""
+
+
+class FORACTError(Exception):
+    """Base exception for all FORACT errors."""
+
+
+# ---------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------
+
+
+class ConfigurationError(FORACTError):
+    """Raised when configuration loading or validation fails."""
+
+
+# ---------------------------------------------------------------------
+# Registry
+# ---------------------------------------------------------------------
+
+
+class RegistryError(FORACTError):
+    """Base class for registry-related errors."""
+
+
+class SchemaError(RegistryError):
+    """Raised when schema registration or lookup fails."""
+
+
+class PluginError(RegistryError):
+    """Raised when plugin registration or lookup fails."""
+
+
+# ---------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------
+
+
+class ValidationError(FORACTError):
+    """Raised when data validation fails."""
+
+
+# ---------------------------------------------------------------------
+# Execution
+# ---------------------------------------------------------------------
+
+
+class ExecutionError(FORACTError):
+    """Raised when an execution step fails."""
+
+==================================================
+FILE: src/foract/exceptions/__init__.py
+==================================================
+from .base import (
+    ConfigurationError,
+    ExecutionError,
+    FORACTError,
+    PluginError,
+    RegistryError,
+    SchemaError,
+    ValidationError,
+)
+
+__all__ = [
+    "FORACTError",
+    "ConfigurationError",
+    "RegistryError",
+    "SchemaError",
+    "PluginError",
+    "ValidationError",
+    "ExecutionError",
+]
+
+==================================================
+FILE: src/foract/__init__.py
+==================================================
+
+==================================================
+FILE: src/foract/log/__init__.py
+==================================================
+from .logger import configure_logging, get_logger
+
+__all__ = [
+    "configure_logging",
+    "get_logger",
+]
+
+==================================================
+FILE: src/foract/log/logger.py
+==================================================
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+from foract.config.settings import Settings
+
+
+def configure_logging(settings: Settings) -> None:
+    """
+    Configure the global FORACT logging system.
+
+    This function is safe to call multiple times. Logging will only be
+    configured once.
+    """
+    root_logger = logging.getLogger()
+
+    # Already configured
+    if root_logger.handlers:
+        return
+
+    log_file = Path(settings.logging.file)
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    handlers: list[logging.Handler] = [
+        logging.FileHandler(log_file, encoding="utf-8"),
+    ]
+
+    if settings.logging.console:
+        handlers.append(logging.StreamHandler())
+
+    logging.basicConfig(
+        level=getattr(logging, settings.logging.level.value),
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=handlers,
+    )
+
+
+def get_logger(name: str) -> logging.Logger:
+    """
+    Return a logger for the given module.
+
+    Example:
+        logger = get_logger(__name__)
+    """
+    return logging.getLogger(name)
+
+==================================================
+FILE: src/foract/models/__init__.py
+==================================================
+from .plugin import PluginDefinition
+from .result import Result
+from .schema import SchemaDefinition
+
+__all__ = [
+    "PluginDefinition",
+    "SchemaDefinition",
+    "Result",
+]
+
+==================================================
+FILE: src/foract/models/node.py
+==================================================
+
+==================================================
+FILE: src/foract/models/plugin.py
+==================================================
+from pydantic import BaseModel
+
+from foract.enums import PluginStatus, PluginType
+
+
+class PluginDefinition(BaseModel):
+    name: str
+    version: str
+    plugin_type: PluginType
+    status: PluginStatus = PluginStatus.ENABLED
+    description: str = ""
+
+==================================================
+FILE: src/foract/models/result.py
+==================================================
+from typing import Generic, TypeVar
+
+from pydantic import BaseModel
+
+T = TypeVar("T")
+
+
+class Result(BaseModel, Generic[T]):
+    success: bool
+    data: T | None = None
+    message: str = ""
+
+==================================================
+FILE: src/foract/models/schema.py
+==================================================
+from pydantic import BaseModel
+
+from foract.enums import SchemaType
+
+
+class SchemaDefinition(BaseModel):
+    name: str
+    version: str
+    schema_type: SchemaType
+    description: str = ""
+
+==================================================
+FILE: src/foract/registry/base.py
+==================================================
+from __future__ import annotations
+
+from typing import Generic, Protocol, TypeVar
+
+from foract.exceptions import RegistryError
+
+
+class Named(Protocol):
+    """
+    Protocol for objects that can be stored in a registry.
+
+    Every registered object must have a unique name.
+    """
+
+    name: str
+
+
+T = TypeVar("T", bound=Named)
+
+
+class Registry(Generic[T]):
+    """
+    Generic in-memory registry.
+
+    Registered objects must expose a ``name`` attribute.
+    """
+
+    def __init__(self) -> None:
+        self._items: dict[str, T] = {}
+
+    def register(self, item: T) -> None:
+        """
+        Register an item.
+        """
+        if item.name in self._items:
+            raise RegistryError(f"{item.name!r} is already registered.")
+
+        self._items[item.name] = item
+
+    def get(self, name: str) -> T:
+        """
+        Return a registered item.
+        """
+        try:
+            return self._items[name]
+        except KeyError as exc:
+            raise RegistryError(f"{name!r} is not registered.") from exc
+
+    def exists(self, name: str) -> bool:
+        """
+        Check whether an item exists.
+        """
+        return name in self._items
+
+    def remove(self, name: str) -> None:
+        """
+        Remove an item.
+        """
+        if name not in self._items:
+            raise RegistryError(f"{name!r} is not registered.")
+
+        del self._items[name]
+
+    def clear(self) -> None:
+        """
+        Remove all registered items.
+        """
+        self._items.clear()
+
+    def list(self) -> list[T]:
+        """
+        Return all registered items.
+        """
+        return list(self._items.values())
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+    def __contains__(self, name: str) -> bool:
+        return name in self._items
+
+    def items(self):
+        return self._items.items()
+
+    def names(self) -> list[str]:
+        return list(self._items.keys())
+
+==================================================
+FILE: src/foract/registry/__init__.py
+==================================================
+from .base import Registry
+from .plugin import PluginRegistry
+from .schema import SchemaRegistry
+
+__all__ = [
+    "Registry",
+    "PluginRegistry",
+    "SchemaRegistry",
+]
+
+==================================================
+FILE: src/foract/registry/plugin.py
+==================================================
+from foract.models import PluginDefinition
+from foract.registry.base import Registry
+
+
+class PluginRegistry(Registry[PluginDefinition]):
+    """
+    Registry for plugin definitions.
+    """
+
+==================================================
+FILE: src/foract/registry/schema.py
+==================================================
+from foract.models import SchemaDefinition
+from foract.registry.base import Registry
+
+
+class SchemaRegistry(Registry[SchemaDefinition]):
+    """
+    Registry for schema definitions.
+    """
+
+==================================================
+FILE: src/foract/schema/builtin.py
+==================================================
+from __future__ import annotations
+
+from foract.registry import SchemaRegistry
+from foract.schema.definition import SchemaDefinition
+from foract.schema.field import FieldDefinition
+
+PROCESS_SCHEMA = SchemaDefinition(
+    name="Process",
+    version="1.0",
+    description="Operating system process.",
+    fields=[
+        FieldDefinition(name="pid", field_type=int),
+        FieldDefinition(name="ppid", field_type=int),
+        FieldDefinition(name="name", field_type=str),
+        FieldDefinition(name="path", field_type=str, required=False),
+        FieldDefinition(name="create_time", field_type=str, required=False),
+    ],
+)
+
+FILE_SCHEMA = SchemaDefinition(
+    name="File",
+    version="1.0",
+    description="Filesystem object.",
+    fields=[
+        FieldDefinition(name="path", field_type=str),
+        FieldDefinition(name="size", field_type=int),
+        FieldDefinition(name="created", field_type=str, required=False),
+        FieldDefinition(name="modified", field_type=str, required=False),
+    ],
+)
+
+PE_SCHEMA = SchemaDefinition(
+    name="PE",
+    version="1.0",
+    description="Portable Executable metadata.",
+    fields=[
+        FieldDefinition(name="path", field_type=str),
+        FieldDefinition(name="architecture", field_type=str),
+        FieldDefinition(name="entry_point", field_type=int),
+        FieldDefinition(name="image_base", field_type=int),
+    ],
+)
+
+SOCKET_SCHEMA = SchemaDefinition(
+    name="Socket",
+    version="1.0",
+    description="Network socket.",
+    fields=[
+        FieldDefinition(name="protocol", field_type=str),
+        FieldDefinition(name="local_address", field_type=str),
+        FieldDefinition(
+            name="remote_address",
+            field_type=str,
+            required=False,
+        ),
+        FieldDefinition(name="state", field_type=str),
+    ],
+)
+
+REGISTRY_KEY_SCHEMA = SchemaDefinition(
+    name="RegistryKey",
+    version="1.0",
+    description="Windows Registry key.",
+    fields=[
+        FieldDefinition(name="path", field_type=str),
+        FieldDefinition(name="last_write_time", field_type=str),
+    ],
+)
+
+EXECUTION_RECORD_SCHEMA = SchemaDefinition(
+    name="ExecutionRecord",
+    version="1.0",
+    description="Program execution record.",
+    fields=[
+        FieldDefinition(name="process_name", field_type=str),
+        FieldDefinition(name="path", field_type=str),
+        FieldDefinition(name="execution_time", field_type=str),
+    ],
+)
+
+BUILTIN_SCHEMAS = [
+    PROCESS_SCHEMA,
+    FILE_SCHEMA,
+    PE_SCHEMA,
+    SOCKET_SCHEMA,
+    REGISTRY_KEY_SCHEMA,
+    EXECUTION_RECORD_SCHEMA,
+]
+
+
+def register_builtin_schemas(registry: SchemaRegistry) -> None:
+    """
+    Register all built-in schemas.
+    """
+    for schema in BUILTIN_SCHEMAS:
+        registry.register(schema)
+
+==================================================
+FILE: src/foract/schema/definition.py
+==================================================
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+from foract.schema.field import FieldDefinition
+
+
+class SchemaDefinition(BaseModel):
+    """
+    Defines the structure of a FORACT schema.
+    """
+
+    name: str
+    version: str
+    description: str = ""
+    fields: list[FieldDefinition] = Field(default_factory=list)
+
+==================================================
+FILE: src/foract/schema/field.py
+==================================================
+from __future__ import annotations
+
+from pydantic import BaseModel
+
+
+class FieldDefinition(BaseModel):
+    """
+    Defines a single field within a schema.
+
+    A field specifies its name, expected Python type,
+    whether it is required, and an optional description.
+    """
+
+    name: str
+    field_type: type
+    required: bool = True
+    description: str = ""
+
+==================================================
+FILE: src/foract/schema/__init__.py
+==================================================
+from .builtin import (
+    BUILTIN_SCHEMAS,
+    EXECUTION_RECORD_SCHEMA,
+    FILE_SCHEMA,
+    PE_SCHEMA,
+    PROCESS_SCHEMA,
+    REGISTRY_KEY_SCHEMA,
+    SOCKET_SCHEMA,
+    register_builtin_schemas,
+)
+from .definition import SchemaDefinition
+from .field import FieldDefinition
+from .validator import validate_node
+
+__all__ = [
+    "FieldDefinition",
+    "SchemaDefinition",
+    "validate_node",
+    "PROCESS_SCHEMA",
+    "FILE_SCHEMA",
+    "PE_SCHEMA",
+    "SOCKET_SCHEMA",
+    "REGISTRY_KEY_SCHEMA",
+    "EXECUTION_RECORD_SCHEMA",
+    "BUILTIN_SCHEMAS",
+    "register_builtin_schemas",
+]
+
+==================================================
+FILE: src/foract/schema/registry.py
+==================================================
+
+==================================================
+FILE: src/foract/schema/validator.py
+==================================================
+from __future__ import annotations
+
+from foract.exceptions import ValidationError
+from foract.schema.definition import SchemaDefinition
+
+
+def validate_node(
+    schema: SchemaDefinition,
+    node: dict[str, object],
+) -> bool:
+    """
+    Validate a node against a schema.
+
+    Returns:
+        True if validation succeeds.
+
+    Raises:
+        ValidationError if validation fails.
+    """
+
+    for field in schema.fields:
+
+        if field.required and field.name not in node:
+            raise ValidationError(
+                f"Missing required field: '{field.name}'."
+            )
+
+        if field.name not in node:
+            continue
+
+        value = node[field.name]
+
+        if not isinstance(value, field.field_type):
+            raise ValidationError(
+                f"Field '{field.name}' expected "
+                f"{field.field_type.__name__}, "
+                f"got {type(value).__name__}."
+            )
+
+    return True
+
+================ TESTS ================
+
+==================================================
+FILE: tests/__init__.py
+==================================================
+
+==================================================
+FILE: tests/test_builtin_schemas.py
+==================================================
+import pytest
+
+from foract.exceptions import RegistryError
+from foract.registry import SchemaRegistry
+from foract.schema import register_builtin_schemas
+
+
+def test_register_builtin_schemas() -> None:
+    registry = SchemaRegistry()
+
+    register_builtin_schemas(registry)
+
+    assert len(registry) == 6
+
+
+def test_builtin_schema_names() -> None:
+    registry = SchemaRegistry()
+
+    register_builtin_schemas(registry)
+
+    assert registry.exists("Process")
+    assert registry.exists("File")
+    assert registry.exists("PE")
+    assert registry.exists("Socket")
+    assert registry.exists("RegistryKey")
+    assert registry.exists("ExecutionRecord")
+
+
+def test_get_builtin_schemas() -> None:
+    registry = SchemaRegistry()
+
+    register_builtin_schemas(registry)
+
+    assert registry.get("Process").name == "Process"
+    assert registry.get("File").name == "File"
+    assert registry.get("PE").name == "PE"
+    assert registry.get("Socket").name == "Socket"
+    assert registry.get("RegistryKey").name == "RegistryKey"
+    assert registry.get("ExecutionRecord").name == "ExecutionRecord"
+
+
+def test_duplicate_builtin_registration() -> None:
+    registry = SchemaRegistry()
+
+    register_builtin_schemas(registry)
+
+    with pytest.raises(RegistryError):
+        register_builtin_schemas(registry)
+
+==================================================
+FILE: tests/test_config.py
+==================================================
+from foract.config import load_settings
+from foract.config.settings import Settings
+
+
+def test_load_settings_returns_settings() -> None:
+    settings = load_settings()
+
+    assert isinstance(settings, Settings)
+
+
+def test_project_configuration() -> None:
+    settings = load_settings()
+
+    assert settings.project.name == "FORACT"
+    assert settings.project.version == "0.1.0"
+    assert settings.project.debug is False
+
+
+def test_logging_configuration() -> None:
+    settings = load_settings()
+
+    assert settings.logging.level == "INFO"
+    assert settings.logging.file == "logs/foract.log"
+
+
+def test_registry_configuration() -> None:
+    settings = load_settings()
+
+    assert settings.registry.auto_discover is True
+    assert settings.registry.plugin_directory == "plugins"
+
+==================================================
+FILE: tests/test_exceptions.py
+==================================================
+from foract.exceptions import (
+    ConfigurationError,
+    FORACTError,
+    PluginError,
+    RegistryError,
+    SchemaError,
+    ValidationError,
+)
+
+
+def test_configuration_error_inheritance() -> None:
+    assert issubclass(ConfigurationError, FORACTError)
+
+
+def test_registry_error_inheritance() -> None:
+    assert issubclass(RegistryError, FORACTError)
+
+
+def test_schema_error_inheritance() -> None:
+    assert issubclass(SchemaError, RegistryError)
+
+
+def test_plugin_error_inheritance() -> None:
+    assert issubclass(PluginError, RegistryError)
+
+
+def test_validation_error_inheritance() -> None:
+    assert issubclass(ValidationError, FORACTError)
+
+==================================================
+FILE: tests/test_field.py
+==================================================
+from foract.schema import FieldDefinition
+
+
+def test_field_definition_defaults() -> None:
+    field = FieldDefinition(
+        name="pid",
+        field_type=int,
+    )
+
+    assert field.name == "pid"
+    assert field.field_type is int
+    assert field.required is True
+    assert field.description == ""
+
+
+def test_optional_field() -> None:
+    field = FieldDefinition(
+        name="command_line",
+        field_type=str,
+        required=False,
+        description="Process command line",
+    )
+
+    assert field.required is False
+    assert field.description == "Process command line"
+
+==================================================
+FILE: tests/test_logging.py
+==================================================
+import logging
+
+from foract.config import load_settings
+from foract.log import configure_logging, get_logger
+
+
+def test_get_logger_returns_logger() -> None:
+    logger = get_logger(__name__)
+
+    assert isinstance(logger, logging.Logger)
+
+
+def test_configure_logging() -> None:
+    settings = load_settings()
+
+    configure_logging(settings)
+
+    logger = get_logger(__name__)
+    logger.info("Test log message")
+
+==================================================
+FILE: tests/test_models.py
+==================================================
+from foract.enums import PluginStatus, PluginType, SchemaType
+from foract.models import PluginDefinition, Result, SchemaDefinition
+
+
+def test_plugin_definition_defaults() -> None:
+    plugin = PluginDefinition(
+        name="windows.pslist",
+        version="1.0",
+        plugin_type=PluginType.VOLATILITY,
+    )
+
+    assert plugin.status == PluginStatus.ENABLED
+    assert plugin.description == ""
+
+
+def test_schema_definition() -> None:
+    schema = SchemaDefinition(
+        name="process",
+        version="1.0",
+        schema_type=SchemaType.ARTIFACT,
+    )
+
+    assert schema.name == "process"
+
+
+def test_result_model() -> None:
+    result = Result[int](
+        success=True,
+        data=42,
+    )
+
+    assert result.success
+    assert result.data == 42
+
+==================================================
+FILE: tests/test_registry.py
+==================================================
+import pytest
+
+from foract.enums import PluginType
+from foract.exceptions import RegistryError
+from foract.models import PluginDefinition
+from foract.registry import PluginRegistry
+
+
+def test_register_plugin() -> None:
+    registry = PluginRegistry()
+
+    plugin = PluginDefinition(
+        name="windows.pslist",
+        version="1.0",
+        plugin_type=PluginType.VOLATILITY,
+    )
+
+    registry.register(plugin)
+
+    assert registry.exists("windows.pslist")
+    assert registry.get("windows.pslist") == plugin
+    assert len(registry) == 1
+    assert "windows.pslist" in registry
+
+
+def test_duplicate_registration() -> None:
+    registry = PluginRegistry()
+
+    plugin = PluginDefinition(
+        name="windows.pslist",
+        version="1.0",
+        plugin_type=PluginType.VOLATILITY,
+    )
+
+    registry.register(plugin)
+
+    with pytest.raises(RegistryError):
+        registry.register(plugin)
+
+
+def test_remove_plugin() -> None:
+    registry = PluginRegistry()
+
+    plugin = PluginDefinition(
+        name="windows.pslist",
+        version="1.0",
+        plugin_type=PluginType.VOLATILITY,
+    )
+
+    registry.register(plugin)
+
+    registry.remove("windows.pslist")
+
+    assert not registry.exists("windows.pslist")
+
+
+def test_clear_registry() -> None:
+    registry = PluginRegistry()
+
+    registry.register(
+        PluginDefinition(
+            name="pslist",
+            version="1.0",
+            plugin_type=PluginType.VOLATILITY,
+        )
+    )
+
+    registry.clear()
+
+    assert len(registry) == 0
+
+
+def test_missing_plugin() -> None:
+    registry = PluginRegistry()
+
+    with pytest.raises(RegistryError):
+        registry.get("does-not-exist")
+
+==================================================
+FILE: tests/test_schema_validation.py
+==================================================
+import pytest
+
+from foract.exceptions import ValidationError
+from foract.schema import (
+    FieldDefinition,
+    SchemaDefinition,
+    validate_node,
+)
+
+
+@pytest.fixture
+def process_schema() -> SchemaDefinition:
+    return SchemaDefinition(
+        name="Process",
+        version="1.0",
+        fields=[
+            FieldDefinition(
+                name="pid",
+                field_type=int,
+            ),
+            FieldDefinition(
+                name="name",
+                field_type=str,
+            ),
+            FieldDefinition(
+                name="path",
+                field_type=str,
+                required=False,
+            ),
+        ],
+    )
+
+
+def test_valid_node(process_schema: SchemaDefinition) -> None:
+    node = {
+        "pid": 100,
+        "name": "cmd.exe",
+    }
+
+    assert validate_node(process_schema, node)
+
+
+def test_missing_required(process_schema: SchemaDefinition) -> None:
+    node = {
+        "pid": 100,
+    }
+
+    with pytest.raises(ValidationError):
+        validate_node(process_schema, node)
+
+
+def test_optional_field(process_schema: SchemaDefinition) -> None:
+    node = {
+        "pid": 100,
+        "name": "cmd.exe",
+    }
+
+    assert validate_node(process_schema, node)
+
+
+def test_wrong_type(process_schema: SchemaDefinition) -> None:
+    node = {
+        "pid": "100",
+        "name": "cmd.exe",
+    }
+
+    with pytest.raises(ValidationError):
+        validate_node(process_schema, node)
+
+
+def test_extra_field(process_schema: SchemaDefinition) -> None:
+    node = {
+        "pid": 100,
+        "name": "cmd.exe",
+        "extra": 123,
+    }
+
+    assert validate_node(process_schema, node)
+
+==================================================
+FILE: tests/test_validator.py
+==================================================

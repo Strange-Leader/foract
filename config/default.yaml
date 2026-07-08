@@ -1,0 +1,13 @@
+project:
+  name: FORACT
+  version: "0.1.0"
+  debug: false
+
+logging:
+  level: INFO
+  file: logs/foract.log
+  console: true
+
+registry:
+  auto_discover: true
+  plugin_directory: plugins
