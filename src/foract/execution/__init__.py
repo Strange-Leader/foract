@@ -1,0 +1,3 @@
+"""
+Execution memory components.
+"""
