@@ -7,6 +7,13 @@ from .base import (
     SchemaError,
     ValidationError,
 )
+from .graph import (
+    DuplicateEdgeError,
+    DuplicateNodeError,
+    EdgeNotFoundError,
+    GraphError,
+    NodeNotFoundError,
+)
 
 __all__ = [
     "FORACTError",
@@ -16,4 +23,9 @@ __all__ = [
     "PluginError",
     "ValidationError",
     "ExecutionError",
+    "GraphError",
+    "DuplicateNodeError",
+    "DuplicateEdgeError",
+    "NodeNotFoundError",
+    "EdgeNotFoundError",
 ]
