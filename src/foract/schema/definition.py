@@ -11,6 +11,17 @@ class SchemaDefinition(BaseModel):
     """
 
     name: str
+
     version: str
+
     description: str = ""
+
     fields: list[FieldDefinition] = Field(default_factory=list)
+
+    @property
+    def identity_fields(self) -> list[FieldDefinition]:
+        """
+        Return all fields that participate in the semantic identity.
+        """
+
+        return [field for field in self.fields if field.identity]

@@ -88,7 +88,7 @@ class MemoryGraphStore(GraphStore):
             raise DuplicateEdgeError(f"Edge '{edge.id}' already exists.")
 
         if edge.source not in self._nodes:
-            raise  NodeNotFoundError(f"Source node '{edge.source}' does not exist.")
+            raise NodeNotFoundError(f"Source node '{edge.source}' does not exist.")
 
         if edge.target not in self._nodes:
             raise NodeNotFoundError(f"Target node '{edge.target}' does not exist.")
@@ -121,10 +121,14 @@ class MemoryGraphStore(GraphStore):
     def list_edges(self) -> list[Edge]:
         return list(self._edges.values())
 
-
     def outgoing_edge_ids(self, node_id: str) -> list[str]:
         return list(self._outgoing.get(node_id, set()))
 
-
     def incoming_edge_ids(self, node_id: str) -> list[str]:
         return list(self._incoming.get(node_id, set()))
+
+    def update_node(self, node: Node) -> None:
+        if node.id not in self._nodes:
+            raise NodeNotFoundError(f"Node '{node.id}' does not exist.")
+
+        self._nodes[node.id] = node

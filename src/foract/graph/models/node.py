@@ -19,6 +19,4 @@ class Node(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     type: NodeType
     properties: dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC)
-    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -15,9 +15,7 @@ class HypothesisNode(Node):
 
     type: NodeType = Field(default=NodeType.HYPOTHESIS)
 
-    status: HypothesisStatus = Field(
-        default=HypothesisStatus.PROPOSED
-    )
+    status: HypothesisStatus = Field(default=HypothesisStatus.PROPOSED)
 
     confidence: float = Field(
         default=0.0,
@@ -31,6 +29,4 @@ class HypothesisNode(Node):
 
     missing_capabilities: list[str] = Field(default_factory=list)
 
-    updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC)
-    )
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

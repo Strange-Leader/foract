@@ -13,6 +13,7 @@ class NodeType(StrEnum):
 
 
 class EdgeType(StrEnum):
+    PARENT_OF = "PARENT_OF"
     SPAWNED = "SPAWNED"
     CONNECTED_TO = "CONNECTED_TO"
     OPENED = "OPENED"

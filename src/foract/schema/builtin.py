@@ -13,7 +13,7 @@ PROCESS_SCHEMA = SchemaDefinition(
     version="1.0",
     description="Operating system process.",
     fields=[
-        FieldDefinition(name="pid", field_type=int),
+        FieldDefinition(name="pid", field_type=int, identity=True),
         FieldDefinition(name="ppid", field_type=int),
         FieldDefinition(name="name", field_type=str),
         FieldDefinition(name="path", field_type=str, required=False),
@@ -26,7 +26,11 @@ FILE_SCHEMA = SchemaDefinition(
     version="1.0",
     description="Filesystem object.",
     fields=[
-        FieldDefinition(name="path", field_type=str),
+        FieldDefinition(
+            name="path",
+            field_type=str,
+            identity=True,
+        ),
         FieldDefinition(name="size", field_type=int),
         FieldDefinition(name="created", field_type=str, required=False),
         FieldDefinition(name="modified", field_type=str, required=False),
@@ -38,7 +42,11 @@ PE_SCHEMA = SchemaDefinition(
     version="1.0",
     description="Portable Executable metadata.",
     fields=[
-        FieldDefinition(name="path", field_type=str),
+        FieldDefinition(
+            name="path",
+            field_type=str,
+            identity=True,
+        ),
         FieldDefinition(name="architecture", field_type=str),
         FieldDefinition(name="entry_point", field_type=int),
         FieldDefinition(name="image_base", field_type=int),
@@ -66,7 +74,11 @@ REGISTRY_KEY_SCHEMA = SchemaDefinition(
     version="1.0",
     description="Windows Registry key.",
     fields=[
-        FieldDefinition(name="path", field_type=str),
+        FieldDefinition(
+            name="path",
+            field_type=str,
+            identity=True,
+        ),
         FieldDefinition(name="last_write_time", field_type=str),
     ],
 )
@@ -95,4 +107,3 @@ BUILTIN_SCHEMAS = [
 def register_builtin_schemas(registry: SchemaRegistry) -> None:
     for schema in BUILTIN_SCHEMAS:
         registry.register(schema)
-

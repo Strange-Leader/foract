@@ -23,6 +23,8 @@ def test_execution_record_is_immutable() -> None:
 
     with pytest.raises(FrozenInstanceError):
         record.command = "new"
+
+
 def test_parameters_are_read_only() -> None:
     record = ExecutionRecord(
         execution_id="1",

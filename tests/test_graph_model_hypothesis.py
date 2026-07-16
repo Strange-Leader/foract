@@ -4,9 +4,7 @@ from foract.graph.models.hypothesis import HypothesisNode
 
 def test_hypothesis_creation():
     hypothesis = HypothesisNode(
-        properties={
-            "description": "Process may have executed PowerShell"
-        }
+        properties={"description": "Process may have executed PowerShell"}
     )
 
     assert hypothesis.type == NodeType.HYPOTHESIS

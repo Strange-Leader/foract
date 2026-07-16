@@ -46,11 +46,7 @@ class GraphQueryEngine:
         Return every node of the specified type.
         """
 
-        return [
-            node
-            for node in self._store.list_nodes()
-            if node.type == node_type
-        ]
+        return [node for node in self._store.list_nodes() if node.type == node_type]
 
     def find_hypotheses(
         self,
@@ -72,16 +68,12 @@ class GraphQueryEngine:
         if status is None:
             return hypotheses
 
-        return [
-            hypothesis
-            for hypothesis in hypotheses
-            if hypothesis.status == status
-        ]
+        return [hypothesis for hypothesis in hypotheses if hypothesis.status == status]
 
     def traverse_relationships(
-    self,
-    node_id: str,
-) -> list[Node]:
+        self,
+        node_id: str,
+    ) -> list[Node]:
         """
         Return all directly connected neighbour nodes.
         """
@@ -149,9 +141,9 @@ class GraphQueryEngine:
         return list(visited.values())
 
     def traverse_provenance(
-    self,
-    node_id: str,
-) -> list[Node]:
+        self,
+        node_id: str,
+    ) -> list[Node]:
         """
         Return all nodes sharing the same provenance
         as the specified node.

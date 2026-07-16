@@ -32,6 +32,7 @@ def test_find_by_property():
 
     assert result == [process]
 
+
 def test_find_by_type():
     store = MemoryGraphStore()
 
@@ -55,7 +56,6 @@ def test_find_by_type():
     assert result == [process]
 
 
-
 def test_find_hypotheses_by_status():
     store = MemoryGraphStore()
 
@@ -72,7 +72,6 @@ def test_find_hypotheses_by_status():
     result = engine.find_hypotheses(HypothesisStatus.ACTIVE)
 
     assert result == [hypothesis]
-
 
 
 def test_find_all_hypotheses():
@@ -123,6 +122,7 @@ def test_relationship_traversal():
 
     assert result == [file]
 
+
 def test_two_hop_traversal():
     store = MemoryGraphStore()
 
@@ -157,28 +157,23 @@ def test_two_hop_traversal():
     assert b in result
     assert c in result
 
+
 def test_traverse_provenance():
     store = MemoryGraphStore()
 
     n1 = Node(
         type=NodeType.PROCESS,
-        properties={
-            "provenance": "plugin:pslist"
-        },
+        properties={"provenance": "plugin:pslist"},
     )
 
     n2 = Node(
         type=NodeType.FILE,
-        properties={
-            "provenance": "plugin:pslist"
-        },
+        properties={"provenance": "plugin:pslist"},
     )
 
     n3 = Node(
         type=NodeType.SOCKET,
-        properties={
-            "provenance": "plugin:netscan"
-        },
+        properties={"provenance": "plugin:netscan"},
     )
 
     store.add_node(n1)

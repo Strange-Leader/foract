@@ -69,10 +69,16 @@ class GraphStore(ABC):
         """
         raise NotImplementedError
 
-
     @abstractmethod
     def incoming_edge_ids(self, node_id: str) -> list[str]:
         """
         Return the IDs of all incoming edges to the given node.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_node(self, node: Node) -> None:
+        """
+        Replace an existing node while preserving its relationships.
         """
         raise NotImplementedError
