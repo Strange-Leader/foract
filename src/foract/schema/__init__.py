@@ -1,27 +1,13 @@
-from .builtin import (
-    BUILTIN_SCHEMAS,
-    EXECUTION_RECORD_SCHEMA,
-    FILE_SCHEMA,
-    PE_SCHEMA,
-    PROCESS_SCHEMA,
-    REGISTRY_KEY_SCHEMA,
-    SOCKET_SCHEMA,
-    register_builtin_schemas,
-)
+from .bootstrap import create_schema_registry
 from .definition import SchemaDefinition
 from .field import FieldDefinition
-from .validator import validate_node
+from .registry import SchemaRegistry
+from .relationship import RelationshipDefinition
 
 __all__ = [
-    "FieldDefinition",
+    "create_schema_registry",
     "SchemaDefinition",
-    "validate_node",
-    "PROCESS_SCHEMA",
-    "FILE_SCHEMA",
-    "PE_SCHEMA",
-    "SOCKET_SCHEMA",
-    "REGISTRY_KEY_SCHEMA",
-    "EXECUTION_RECORD_SCHEMA",
-    "BUILTIN_SCHEMAS",
-    "register_builtin_schemas",
+    "FieldDefinition",
+    "SchemaRegistry",
+    "RelationshipDefinition",
 ]
