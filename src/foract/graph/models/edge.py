@@ -2,27 +2,34 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
-
-from foract.graph.enums import EdgeType
 
 
 class Edge(BaseModel):
     """
-    A directed relationship between two graph nodes.
+    Generic directed relationship stored in the Evidence Graph.
+
+    The semantic meaning of the relationship is defined by the
+    Schema Registry. The graph stores relationships generically
+    and performs no interpretation of their meaning.
     """
 
     model_config = ConfigDict(frozen=True)
 
-    id: str = Field(default_factory=lambda: str(uuid4()))
+    id: UUID = Field(default_factory=uuid4)
 
-    source: str
-    target: str
+    source: UUID
 
-    type: EdgeType
+    target: UUID
+
+    # Name of the registered relationship
+    # (e.g. SUPPORTS, GENERATED_FROM).
+    relationship: str
 
     properties: dict[str, Any] = Field(default_factory=dict)
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC)
+    )

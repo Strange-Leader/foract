@@ -1,0 +1,509 @@
+============================================================
+FILE: src/foract/graph/store/memory_graph_store.py
+============================================================
+from __future__ import annotations
+
+from uuid import UUID
+
+from foract.exceptions import (
+    DuplicateEdgeError,
+    DuplicateNodeError,
+    EdgeNotFoundError,
+    NodeNotFoundError,
+)
+from foract.graph.models.edge import Edge
+from foract.graph.models.node import Node
+from foract.graph.store.graph_store import GraphStore
+
+
+class MemoryGraphStore(GraphStore):
+    """
+    In-memory implementation of the Evidence Graph.
+
+    This class is responsible only for storing nodes and edges while
+    maintaining adjacency indexes for efficient traversal.
+
+    It performs no reasoning, validation, or graph querying.
+    """
+
+    def __init__(self) -> None:
+        self._nodes: dict[UUID, Node] = {}
+        self._edges: dict[UUID, Edge] = {}
+
+        # node_id -> edge_ids
+        self._outgoing: dict[UUID, set[UUID]] = {}
+        self._incoming: dict[UUID, set[UUID]] = {}
+
+    # ==========================================================
+    # Node Operations
+    # ==========================================================
+
+    def add_node(self, node: Node) -> None:
+        if node.id in self._nodes:
+            raise DuplicateNodeError(
+                f"Node '{node.id}' already exists."
+            )
+
+        self._nodes[node.id] = node
+
+        self._outgoing[node.id] = set()
+        self._incoming[node.id] = set()
+
+    def get_node(self, node_id: UUID) -> Node | None:
+        return self._nodes.get(node_id)
+
+    def update_node(self, node: Node) -> None:
+        if node.id not in self._nodes:
+            raise NodeNotFoundError(
+                f"Node '{node.id}' does not exist."
+            )
+
+        self._nodes[node.id] = node
+
+    def remove_node(self, node_id: UUID) -> None:
+        if node_id not in self._nodes:
+            raise NodeNotFoundError(
+                f"Node '{node_id}' does not exist."
+            )
+
+        #
+        # Remove outgoing edges
+        #
+        for edge_id in list(self._outgoing[node_id]):
+            self.remove_edge(edge_id)
+
+        #
+        # Remove incoming edges
+        #
+        for edge_id in list(self._incoming[node_id]):
+            self.remove_edge(edge_id)
+
+        self._outgoing.pop(node_id, None)
+        self._incoming.pop(node_id, None)
+
+        del self._nodes[node_id]
+
+    def list_nodes(self) -> list[Node]:
+        return list(self._nodes.values())
+
+    # ==========================================================
+    # Edge Operations
+    # ==========================================================
+
+    def add_edge(self, edge: Edge) -> None:
+        if edge.id in self._edges:
+            raise DuplicateEdgeError(
+                f"Edge '{edge.id}' already exists."
+            )
+
+        if edge.source not in self._nodes:
+            raise NodeNotFoundError(
+                f"Source node '{edge.source}' does not exist."
+            )
+
+        if edge.target not in self._nodes:
+            raise NodeNotFoundError(
+                f"Target node '{edge.target}' does not exist."
+            )
+
+        self._edges[edge.id] = edge
+
+        self._outgoing[edge.source].add(edge.id)
+        self._incoming[edge.target].add(edge.id)
+
+    def get_edge(self, edge_id: UUID) -> Edge | None:
+        return self._edges.get(edge_id)
+
+    def remove_edge(self, edge_id: UUID) -> None:
+        if edge_id not in self._edges:
+            raise EdgeNotFoundError(
+                f"Edge '{edge_id}' does not exist."
+            )
+
+        edge = self._edges[edge_id]
+
+        self._outgoing[edge.source].discard(edge_id)
+        self._incoming[edge.target].discard(edge_id)
+
+        del self._edges[edge_id]
+
+    def list_edges(self) -> list[Edge]:
+        return list(self._edges.values())
+
+    def outgoing_edge_ids(
+        self,
+        node_id: UUID,
+    ) -> list[UUID]:
+        return list(self._outgoing.get(node_id, set()))
+
+    def incoming_edge_ids(
+        self,
+        node_id: UUID,
+    ) -> list[UUID]:
+        return list(self._incoming.get(node_id, set()))
+
+============================================================
+FILE: src/foract/graph/store/graph_store.py
+============================================================
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+from foract.graph.models.edge import Edge
+from foract.graph.models.node import Node
+
+
+class GraphStore(ABC):
+    """
+    Abstract storage interface for the Evidence Graph.
+
+    The GraphStore is responsible only for storing and retrieving
+    nodes and edges. It performs no querying, traversal, validation,
+    or reasoning.
+    """
+
+    # ==========================================================
+    # Node Operations
+    # ==========================================================
+
+    @abstractmethod
+    def add_node(self, node: Node) -> None:
+        """Store a node."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_node(self, node_id: UUID) -> Node | None:
+        """Retrieve a node by its ID."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_node(self, node: Node) -> None:
+        """Replace an existing node."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_node(self, node_id: UUID) -> None:
+        """Remove a node."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_nodes(self) -> list[Node]:
+        """Return all stored nodes."""
+        raise NotImplementedError
+
+    # ==========================================================
+    # Edge Operations
+    # ==========================================================
+
+    @abstractmethod
+    def add_edge(self, edge: Edge) -> None:
+        """Store an edge."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_edge(self, edge_id: UUID) -> Edge | None:
+        """Retrieve an edge."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_edge(self, edge_id: UUID) -> None:
+        """Remove an edge."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_edges(self) -> list[Edge]:
+        """Return all stored edges."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def outgoing_edge_ids(self, node_id: UUID) -> list[UUID]:
+        """Return outgoing edge IDs."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def incoming_edge_ids(self, node_id: UUID) -> list[UUID]:
+        """Return incoming edge IDs."""
+        raise NotImplementedError
+
+============================================================
+FILE: src/foract/graph/store/__init__.py
+============================================================
+from .graph_store import GraphStore
+from .memory_graph_store import MemoryGraphStore
+
+__all__ = [
+    "GraphStore",
+    "MemoryGraphStore",
+]
+
+============================================================
+FILE: src/foract/graph/models/node.py
+============================================================
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import Any
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class Node(BaseModel):
+    """
+    Generic node stored in the Evidence Graph.
+
+    A node represents a semantic entity defined by the Schema Registry.
+    The graph stores nodes generically and does not interpret their
+    schema-specific meaning.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID = Field(default_factory=uuid4)
+
+    # Name of the registered schema (e.g. Process, File, Hypothesis).
+    schema: str
+
+    # Schema-defined field values.
+    properties: dict[str, Any] = Field(default_factory=dict)
+
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC)
+    )
+
+============================================================
+FILE: src/foract/graph/models/__init__.py
+============================================================
+from .edge import Edge
+from .node import Node
+
+__all__ = [
+    "Node",
+    "Edge",
+]
+
+============================================================
+FILE: src/foract/graph/models/edge.py
+============================================================
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import Any
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class Edge(BaseModel):
+    """
+    Generic directed relationship stored in the Evidence Graph.
+
+    The semantic meaning of the relationship is defined by the
+    Schema Registry. The graph stores relationships generically
+    and performs no interpretation of their meaning.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID = Field(default_factory=uuid4)
+
+    source: UUID
+
+    target: UUID
+
+    # Name of the registered relationship
+    # (e.g. SUPPORTS, GENERATED_FROM).
+    relationship: str
+
+    properties: dict[str, Any] = Field(default_factory=dict)
+
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC)
+    )
+
+============================================================
+FILE: src/foract/graph/__init__.py
+============================================================
+from .models import Edge, Node
+from .query import GraphQueryEngine
+from .store import GraphStore, MemoryGraphStore
+
+__all__ = [
+    "Node",
+    "Edge",
+    "GraphStore",
+    "MemoryGraphStore",
+    "GraphQueryEngine",
+]
+
+============================================================
+FILE: src/foract/graph/query/query_engine.py
+============================================================
+from __future__ import annotations
+
+from collections import deque
+from typing import Any
+from uuid import UUID
+
+from foract.graph.models.node import Node
+from foract.graph.store.graph_store import GraphStore
+
+
+class GraphQueryEngine:
+    """
+    Read-only query engine for the Evidence Graph.
+
+    The query engine performs generic graph queries and traversal.
+    It never modifies the graph and does not contain investigation-
+    specific or verification-specific logic.
+    """
+
+    def __init__(self, store: GraphStore) -> None:
+        self._store = store
+
+    # ==========================================================
+    # Find Queries
+    # ==========================================================
+
+    def find_by_schema(
+        self,
+        schema: str,
+    ) -> list[Node]:
+        """
+        Return all nodes belonging to the specified schema.
+        """
+
+        return [
+            node
+            for node in self._store.list_nodes()
+            if node.schema == schema
+        ]
+
+    def find_by_property(
+        self,
+        key: str,
+        value: Any,
+    ) -> list[Node]:
+        """
+        Return all nodes whose property matches the given value.
+        """
+
+        return [
+            node
+            for node in self._store.list_nodes()
+            if node.properties.get(key) == value
+        ]
+
+    # ==========================================================
+    # Traversal
+    # ==========================================================
+
+    def traverse(
+        self,
+        node_id: UUID,
+        *,
+        relationship: str | None = None,
+        incoming: bool = True,
+        outgoing: bool = True,
+    ) -> list[Node]:
+        """
+        Return all neighbouring nodes.
+
+        If 'relationship' is provided, only edges of that relationship
+        type are traversed.
+        """
+
+        neighbours: dict[Any, Node] = {}
+
+        if outgoing:
+            for edge_id in self._store.outgoing_edge_ids(node_id):
+                edge = self._store.get_edge(edge_id)
+
+                if edge is None:
+                    continue
+
+                if (
+                    relationship is not None
+                    and edge.relationship != relationship
+                ):
+                    continue
+
+                node = self._store.get_node(edge.target)
+
+                if node is not None:
+                    neighbours[node.id] = node
+
+        if incoming:
+            for edge_id in self._store.incoming_edge_ids(node_id):
+                edge = self._store.get_edge(edge_id)
+
+                if edge is None:
+                    continue
+
+                if (
+                    relationship is not None
+                    and edge.relationship != relationship
+                ):
+                    continue
+
+                node = self._store.get_node(edge.source)
+
+                if node is not None:
+                    neighbours[node.id] = node
+
+        return list(neighbours.values())
+
+    def traverse_n_hops(
+        self,
+        node_id: UUID,
+        hops: int,
+        *,
+        relationship: str | None = None,
+    ) -> list[Node]:
+        """
+        Traverse the graph up to the specified number of hops.
+        """
+
+        if hops <= 0:
+            return []
+
+        visited: set[UUID] = {node_id}
+        discovered: dict[UUID, Node] = {}
+
+        queue = deque([(node_id, 0)])
+
+        while queue:
+            current_id, depth = queue.popleft()
+
+            if depth >= hops:
+                continue
+
+            for neighbour in self.traverse(
+                current_id,
+                relationship=relationship,
+            ):
+                if neighbour.id in visited:
+                    continue
+
+                visited.add(neighbour.id)
+                discovered[neighbour.id] = neighbour
+
+                queue.append(
+                    (
+                        neighbour.id,
+                        depth + 1,
+                    )
+                )
+
+        return list(discovered.values())
+
+============================================================
+FILE: src/foract/graph/query/__init__.py
+============================================================
+from .query_engine import GraphQueryEngine
+
+__all__ = [
+    "GraphQueryEngine",
+]
+

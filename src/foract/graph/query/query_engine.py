@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from collections import deque
 from typing import Any
+from uuid import UUID
 
-from foract.graph.enums import HypothesisStatus, NodeType
-from foract.graph.models.hypothesis import HypothesisNode
 from foract.graph.models.node import Node
 from foract.graph.store.graph_store import GraphStore
 
@@ -12,8 +12,9 @@ class GraphQueryEngine:
     """
     Read-only query engine for the Evidence Graph.
 
-    The query engine never modifies the graph.
-    It only reads from a GraphStore.
+    The query engine performs generic graph queries and traversal.
+    It never modifies the graph and does not contain investigation-
+    specific or verification-specific logic.
     """
 
     def __init__(self, store: GraphStore) -> None:
@@ -23,13 +24,27 @@ class GraphQueryEngine:
     # Find Queries
     # ==========================================================
 
+    def find_by_schema(
+        self,
+        schema: str,
+    ) -> list[Node]:
+        """
+        Return all nodes belonging to the specified schema.
+        """
+
+        return [
+            node
+            for node in self._store.list_nodes()
+            if node.schema == schema
+        ]
+
     def find_by_property(
         self,
         key: str,
         value: Any,
     ) -> list[Node]:
         """
-        Return every node whose property matches the given value.
+        Return all nodes whose property matches the given value.
         """
 
         return [
@@ -38,134 +53,105 @@ class GraphQueryEngine:
             if node.properties.get(key) == value
         ]
 
-    def find_by_type(
+    # ==========================================================
+    # Traversal
+    # ==========================================================
+
+    def traverse(
         self,
-        node_type: NodeType,
+        node_id: UUID,
+        *,
+        relationship: str | None = None,
+        incoming: bool = True,
+        outgoing: bool = True,
     ) -> list[Node]:
         """
-        Return every node of the specified type.
+        Return all neighbouring nodes.
+
+        If 'relationship' is provided, only edges of that relationship
+        type are traversed.
         """
 
-        return [node for node in self._store.list_nodes() if node.type == node_type]
+        neighbours: dict[Any, Node] = {}
 
-    def find_hypotheses(
+        if outgoing:
+            for edge_id in self._store.outgoing_edge_ids(node_id):
+                edge = self._store.get_edge(edge_id)
+
+                if edge is None:
+                    continue
+
+                if (
+                    relationship is not None
+                    and edge.relationship != relationship
+                ):
+                    continue
+
+                node = self._store.get_node(edge.target)
+
+                if node is not None:
+                    neighbours[node.id] = node
+
+        if incoming:
+            for edge_id in self._store.incoming_edge_ids(node_id):
+                edge = self._store.get_edge(edge_id)
+
+                if edge is None:
+                    continue
+
+                if (
+                    relationship is not None
+                    and edge.relationship != relationship
+                ):
+                    continue
+
+                node = self._store.get_node(edge.source)
+
+                if node is not None:
+                    neighbours[node.id] = node
+
+        return list(neighbours.values())
+
+    def traverse_n_hops(
         self,
-        status: HypothesisStatus | None = None,
-    ) -> list[HypothesisNode]:
-        """
-        Return hypothesis nodes.
-
-        If status is None, return all hypotheses.
-        Otherwise, return only hypotheses with the given status.
-        """
-
-        hypotheses = [
-            node
-            for node in self._store.list_nodes()
-            if isinstance(node, HypothesisNode)
-        ]
-
-        if status is None:
-            return hypotheses
-
-        return [hypothesis for hypothesis in hypotheses if hypothesis.status == status]
-
-    def traverse_relationships(
-        self,
-        node_id: str,
+        node_id: UUID,
+        hops: int,
+        *,
+        relationship: str | None = None,
     ) -> list[Node]:
         """
-        Return all directly connected neighbour nodes.
+        Traverse the graph up to the specified number of hops.
         """
 
-        neighbours: list[Node] = []
-
-        #
-        # Outgoing
-        #
-        for edge_id in self._store.outgoing_edge_ids(node_id):
-            edge = self._store.get_edge(edge_id)
-
-            if edge is None:
-                continue
-
-            node = self._store.get_node(edge.target)
-
-            if node is not None:
-                neighbours.append(node)
-
-        #
-        # Incoming
-        #
-        for edge_id in self._store.incoming_edge_ids(node_id):
-            edge = self._store.get_edge(edge_id)
-
-            if edge is None:
-                continue
-
-            node = self._store.get_node(edge.source)
-
-            if node is not None and node not in neighbours:
-                neighbours.append(node)
-
-        return neighbours
-
-    def traverse_two_hops(
-        self,
-        node_id: str,
-    ) -> list[Node]:
-        """
-        Return every node reachable within two hops.
-        """
-
-        visited: dict[str, Node] = {}
-
-        #
-        # First hop
-        #
-        first_hop = self.traverse_relationships(node_id)
-
-        for node in first_hop:
-            visited[node.id] = node
-
-        #
-        # Second hop
-        #
-        for node in first_hop:
-            second = self.traverse_relationships(node.id)
-
-            for neighbour in second:
-                if neighbour.id != node_id:
-                    visited[neighbour.id] = neighbour
-
-        return list(visited.values())
-
-    def traverse_provenance(
-        self,
-        node_id: str,
-    ) -> list[Node]:
-        """
-        Return all nodes sharing the same provenance
-        as the specified node.
-        """
-
-        node = self._store.get_node(node_id)
-
-        if node is None:
+        if hops <= 0:
             return []
 
-        provenance = node.properties.get("provenance")
+        visited: set[UUID] = {node_id}
+        discovered: dict[UUID, Node] = {}
 
-        if provenance is None:
-            return []
+        queue = deque([(node_id, 0)])
 
-        result = []
+        while queue:
+            current_id, depth = queue.popleft()
 
-        for candidate in self._store.list_nodes():
-            if (
-                candidate.id != node.id
-                and candidate.properties.get("provenance") == provenance
+            if depth >= hops:
+                continue
+
+            for neighbour in self.traverse(
+                current_id,
+                relationship=relationship,
             ):
-                result.append(candidate)
+                if neighbour.id in visited:
+                    continue
 
-        return result
+                visited.add(neighbour.id)
+                discovered[neighbour.id] = neighbour
+
+                queue.append(
+                    (
+                        neighbour.id,
+                        depth + 1,
+                    )
+                )
+
+        return list(discovered.values())

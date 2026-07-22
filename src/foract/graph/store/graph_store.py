@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from uuid import UUID
 
 from foract.graph.models.edge import Edge
 from foract.graph.models.node import Node
@@ -8,15 +9,16 @@ from foract.graph.models.node import Node
 
 class GraphStore(ABC):
     """
-    Abstract interface for graph storage backends.
+    Abstract storage interface for the Evidence Graph.
 
-    The GraphStore is responsible ONLY for storing and retrieving
-    nodes and edges. It performs no querying, traversal, or reasoning.
+    The GraphStore is responsible only for storing and retrieving
+    nodes and edges. It performs no querying, traversal, validation,
+    or reasoning.
     """
 
-    # ------------------------------------------------------------------
+    # ==========================================================
     # Node Operations
-    # ------------------------------------------------------------------
+    # ==========================================================
 
     @abstractmethod
     def add_node(self, node: Node) -> None:
@@ -24,13 +26,18 @@ class GraphStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_node(self, node_id: str) -> Node | None:
+    def get_node(self, node_id: UUID) -> Node | None:
         """Retrieve a node by its ID."""
         raise NotImplementedError
 
     @abstractmethod
-    def remove_node(self, node_id: str) -> None:
-        """Remove a node by its ID."""
+    def update_node(self, node: Node) -> None:
+        """Replace an existing node."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_node(self, node_id: UUID) -> None:
+        """Remove a node."""
         raise NotImplementedError
 
     @abstractmethod
@@ -38,9 +45,9 @@ class GraphStore(ABC):
         """Return all stored nodes."""
         raise NotImplementedError
 
-    # ------------------------------------------------------------------
+    # ==========================================================
     # Edge Operations
-    # ------------------------------------------------------------------
+    # ==========================================================
 
     @abstractmethod
     def add_edge(self, edge: Edge) -> None:
@@ -48,13 +55,13 @@ class GraphStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_edge(self, edge_id: str) -> Edge | None:
-        """Retrieve an edge by its ID."""
+    def get_edge(self, edge_id: UUID) -> Edge | None:
+        """Retrieve an edge."""
         raise NotImplementedError
 
     @abstractmethod
-    def remove_edge(self, edge_id: str) -> None:
-        """Remove an edge by its ID."""
+    def remove_edge(self, edge_id: UUID) -> None:
+        """Remove an edge."""
         raise NotImplementedError
 
     @abstractmethod
@@ -63,22 +70,11 @@ class GraphStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def outgoing_edge_ids(self, node_id: str) -> list[str]:
-        """
-        Return the IDs of all outgoing edges from the given node.
-        """
+    def outgoing_edge_ids(self, node_id: UUID) -> list[UUID]:
+        """Return outgoing edge IDs."""
         raise NotImplementedError
 
     @abstractmethod
-    def incoming_edge_ids(self, node_id: str) -> list[str]:
-        """
-        Return the IDs of all incoming edges to the given node.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def update_node(self, node: Node) -> None:
-        """
-        Replace an existing node while preserving its relationships.
-        """
+    def incoming_edge_ids(self, node_id: UUID) -> list[UUID]:
+        """Return incoming edge IDs."""
         raise NotImplementedError
