@@ -1,59 +1,43 @@
-"""
-Operational reporting models for the Evidence Integration Engine.
-
-An IntegrationReport summarizes the outcome of a single evidence
-integration run. It records processing statistics, validation failures,
-parser warnings, and semantic conflicts encountered while ingesting
-forensic evidence into the Evidence Graph.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Any
+from enum import StrEnum
+from uuid import UUID
 
 
-class IntegrationStatus(Enum):
+class IntegrationStatus(StrEnum):
     """
     Overall outcome of an evidence integration run.
     """
 
-    SUCCESS = auto()
-    PARTIAL_SUCCESS = auto()
-    FAILED = auto()
+    SUCCESS = "success"
+    PARTIAL_SUCCESS = "partial_success"
+    FAILED = "failed"
 
 
-@dataclass(frozen=True)
-class ConflictEntry:
-    """
-    Records a semantic conflict encountered during entity resolution.
-
-    Conflicts are never resolved during Phase 3.
-    They are recorded for future reasoning phases.
-    """
-
-    entity_identity_key: str
-    field: str
-    existing_value: Any
-    incoming_value: Any
-    execution_id: str
-
-
-@dataclass
+@dataclass(frozen=True, slots=True)
 class IntegrationReport:
     """
-    Operational summary produced after integrating forensic evidence.
+    Operational summary of a completed evidence integration.
+
+    The report describes the outcome of integrating a single
+    ExecutionRecord into the Evidence Graph.
     """
 
-    execution_id: str
+    execution_id: UUID
+
+    plugin_id: str
+
     status: IntegrationStatus
 
-    processed_records: int = 0
-    integrated_records: int = 0
-    rejected_records: int = 0
+    processed_artifacts: int = 0
 
-    parser_warnings: list[str] = field(default_factory=list)
-    validation_failures: list[str] = field(default_factory=list)
-    conflicts: list[ConflictEntry] = field(default_factory=list)
-    integration_warnings: list[str] = field(default_factory=list)
+    integrated_nodes: int = 0
+
+    integrated_edges: int = 0
+
+    duplicate_artifacts: int = 0
+
+    validation_failures: tuple[str, ...] = field(default_factory=tuple)
+
+    warnings: tuple[str, ...] = field(default_factory=tuple)

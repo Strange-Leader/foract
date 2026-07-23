@@ -1,49 +1,81 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
+
+from foract.integration.models import (
+    ParsedArtifact,
+)
 
 
 class Normalizer:
     """
-    Converts plugin-specific field names into FORACT schema field names.
-    """
+    Canonicalizes parsed artifacts.
 
-    def __init__(self) -> None:
-        self._mappings: dict[str, dict[str, str]] = {
-            "windows.pslist": {
-                "PID": "pid",
-                "PPID": "ppid",
-                "Name": "name",
-                "ImageFileName": "name",
-                "CreateTime": "create_time",
-                "Path": "path",
-            }
-        }
+    The Normalizer converts parser-specific output into the
+    canonical representation expected by the Validator and the
+    remaining integration pipeline.
+
+    It performs no validation or graph operations.
+    """
 
     def normalize(
         self,
-        plugin_id: str,
-        records: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
+        artifact: ParsedArtifact,
+    ) -> ParsedArtifact:
         """
-        Normalize plugin output into FORACT schema field names.
+        Normalize a parsed artifact.
         """
 
-        mapping = self._mappings.get(plugin_id)
+        return ParsedArtifact(
+            schema=artifact.schema,
+            properties=self._normalize_properties(
+                artifact.properties,
+            ),
+            source=artifact.source,
+        )
 
-        if mapping is None:
-            raise ValueError(
-                f"No normalization mapping registered for " f"'{plugin_id}'."
+    def _normalize_properties(
+        self,
+        properties: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Normalize property names and values.
+        """
+
+        normalized: dict[str, Any] = {}
+
+        for key, value in properties.items():
+            normalized[key] = self._normalize_value(
+                value,
             )
 
-        normalized_records: list[dict[str, Any]] = []
+        return normalized
 
-        for record in records:
+    def _normalize_value(
+        self,
+        value: Any,
+    ) -> Any:
+        """
+        Normalize a single property value.
+        """
 
-            normalized_record = {
-                mapping.get(field, field): value for field, value in record.items()
-            }
+        #
+        # Strip surrounding whitespace.
+        #
+        if isinstance(value, str):
+            return value.strip()
 
-            normalized_records.append(normalized_record)
+        #
+        # Recursively normalize lists.
+        #
+        if isinstance(value, list):
+            return [self._normalize_value(v) for v in value]
 
-        return normalized_records
+        #
+        # Recursively normalize dictionaries.
+        #
+        if isinstance(value, dict):
+            return {k: self._normalize_value(v) for k, v in value.items()}
+
+        return value

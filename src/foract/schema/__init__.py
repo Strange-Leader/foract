@@ -3,6 +3,9 @@ from .definition import SchemaDefinition
 from .field import FieldDefinition
 from .registry import SchemaRegistry
 from .relationship import RelationshipDefinition
+from .relationship_mapping import (
+    RelationshipMappingDefinition,
+)
 
 __all__ = [
     "create_schema_registry",
@@ -10,4 +13,5 @@ __all__ = [
     "FieldDefinition",
     "SchemaRegistry",
     "RelationshipDefinition",
+    "RelationshipMappingDefinition",
 ]

@@ -104,7 +104,7 @@ HYPOTHESIS_SCHEMA = SchemaDefinition(
     name="Hypothesis",
     category=SchemaCategory.ENTITY,
     version="1.0",
-    description="Current investigative belief regarding an activity, event, or conclusion.",
+    description="Current investigative belief regarding an activity, event, or conclusion.",  # noqa: E501
     fields=[
         field("id", UUID, identity=True),
         field("title", str),

@@ -30,6 +30,4 @@ class Edge(BaseModel):
 
     properties: dict[str, Any] = Field(default_factory=dict)
 
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC)
-    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

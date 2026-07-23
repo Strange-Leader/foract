@@ -1,7 +1,15 @@
-from .plugin import PluginDefinition
-from .result import Result
+"""
+Core FORACT domain models.
+"""
+
+from foract.models.execution_record import ExecutionRecord
+from foract.models.execution_report import ExecutionReport
+from foract.models.operational_artifact import OperationalArtifact
+from foract.models.verification_report import VerificationReport
 
 __all__ = [
-    "PluginDefinition",
-    "Result",
+    "OperationalArtifact",
+    "ExecutionRecord",
+    "ExecutionReport",
+    "VerificationReport",
 ]

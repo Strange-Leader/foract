@@ -1,123 +1,116 @@
 from __future__ import annotations
 
-from typing import Any
-
-from foract.graph.enums import EdgeType, NodeType
 from foract.integration.models import (
     MappedEntity,
+    ParsedArtifact,
     RelationshipDescriptor,
 )
-from foract.registry import SchemaRegistry
 from foract.schema.definition import SchemaDefinition
+from foract.schema.registry import SchemaRegistry
 
 
-class EvidenceMapper:
+class Mapper:
     """
-    Converts validated forensic records into semantic entities.
+    Maps validated ParsedArtifacts into semantic MappedEntity objects.
 
-    The mapper produces unresolved MappedEntity objects.
-    Entity resolution and graph persistence occur later in the
-    integration pipeline.
+    Responsibilities
+    ----------------
+    - Build semantic identity keys.
+    - Build logical relationship descriptors.
+    - Produce immutable MappedEntity objects.
+
+    The Mapper performs no persistence, graph operations,
+    deduplication, or UUID allocation.
     """
 
     def __init__(
         self,
-        registry: SchemaRegistry,
+        schema_registry: SchemaRegistry,
     ) -> None:
-        self._registry = registry
-
-        self._node_types: dict[str, NodeType] = {
-            "Process": NodeType.PROCESS,
-            "File": NodeType.FILE,
-            "PE": NodeType.PE,
-            "Socket": NodeType.SOCKET,
-            "RegistryKey": NodeType.REGISTRY_KEY,
-        }
+        self._schema_registry = schema_registry
 
     def map(
         self,
-        schema_name: str,
-        records: list[dict[str, Any]],
-    ) -> list[MappedEntity]:
+        artifact: ParsedArtifact,
+    ) -> MappedEntity:
         """
-        Convert validated records into semantic entities.
+        Convert a validated ParsedArtifact into a semantic
+        MappedEntity.
         """
 
-        schema = self._registry.get(schema_name)
+        #
+        # Lookup schema definition.
+        #
+        schema = self._schema_registry.get_schema(
+            artifact.schema,
+        )
 
-        node_type = self._node_types.get(schema.name)
+        #
+        # Build semantic identity key.
+        #
+        identity_key = self._build_identity_key(
+            schema,
+            artifact,
+        )
 
-        if node_type is None:
-            raise ValueError(f"No NodeType registered for schema '{schema.name}'.")
+        #
+        # Build relationship descriptors.
+        #
+        relationships: list[RelationshipDescriptor] = []
 
-        entities: list[MappedEntity] = []
-
-        for record in records:
-
-            identity_key = self._build_identity_key(
-                schema,
-                record,
-            )
-
-            relationships = self._build_relationships(
+        relationship_mappings = (
+            self._schema_registry.get_relationship_mappings_for_schema(
                 schema.name,
-                record,
+            )
+        )
+
+        for mapping in relationship_mappings:
+
+            source_value = artifact.properties.get(
+                mapping.source_field,
             )
 
-            entities.append(
-                MappedEntity(
-                    schema_name=schema.name,
-                    node_type=node_type,
-                    properties=dict(record),
-                    identity_key=identity_key,
-                    relationships=relationships,
+            #
+            # Relationship cannot be derived.
+            #
+            if source_value is None:
+                continue
+
+            target_identity_key = (
+                f"{mapping.target_schema}:" f"{mapping.target_field}={source_value}"
+            )
+
+            relationships.append(
+                RelationshipDescriptor(
+                    relationship=mapping.relationship.name,
+                    target_identity_key=target_identity_key,
                 )
             )
 
-        return entities
+        #
+        # Produce semantic entity.
+        #
+        return MappedEntity(
+            schema=schema.name,
+            properties=artifact.properties,
+            identity_key=identity_key,
+            relationships=tuple(relationships),
+        )
 
     def _build_identity_key(
         self,
         schema: SchemaDefinition,
-        record: dict[str, Any],
+        artifact: ParsedArtifact,
     ) -> str:
         """
-        Construct the semantic identity key using the schema's
-        identity fields.
+        Build the semantic identity key for a parsed artifact.
         """
 
-        identity_parts = []
+        identity_parts: list[str] = []
 
         for field in schema.identity_fields:
-            identity_parts.append(f"{field.name}={record[field.name]}")
+            value = artifact.properties[field.name]
+
+            identity_parts.append(f"{field.name}={value}")
 
         return f"{schema.name}:" + "|".join(identity_parts)
-
-    def _build_relationships(
-        self,
-        schema_name: str,
-        record: dict[str, Any],
-    ) -> list[RelationshipDescriptor]:
-        """
-        Produce logical relationship descriptors.
-
-        These relationships are resolved later after node UUIDs
-        are known.
-        """
-
-        relationships: list[RelationshipDescriptor] = []
-
-        if schema_name == "Process":
-
-            parent_pid = record.get("ppid")
-
-            if parent_pid is not None:
-
-                relationships.append(
-                    RelationshipDescriptor(
-                        edge_type=EdgeType.PARENT_OF,
-                        target_identity_key=(f"Process:pid={parent_pid}"),
-                    )
-                )
-
-        return relationships

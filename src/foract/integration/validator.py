@@ -1,56 +1,105 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from foract.exceptions import ValidationError
-from foract.registry import SchemaRegistry
-from foract.schema.validator import validate_node
+from foract.integration.models import ParsedArtifact
+from foract.schema.definition import SchemaDefinition
+from foract.schema.field import FieldDefinition
+from foract.schema.registry import SchemaRegistry
 
 
 class Validator:
     """
-    Validates normalized records against FORACT schemas.
+    Validates normalized ParsedArtifacts against the Schema Registry.
 
-    This class is a thin wrapper around the Phase 0 schema validator.
+    The Validator performs structural validation only.
+    It never modifies artifacts.
     """
 
     def __init__(
         self,
-        registry: SchemaRegistry,
+        schema_registry: SchemaRegistry,
     ) -> None:
-        self._registry = registry
+        self._schema_registry = schema_registry
 
     def validate(
         self,
-        schema_name: str,
-        records: list[dict[str, Any]],
-    ) -> tuple[list[dict[str, Any]], list[str]]:
+        artifact: ParsedArtifact,
+    ) -> ParsedArtifact:
         """
-        Validate a batch of normalized records.
+        Validate a parsed artifact.
 
-        Returns
-        -------
-        tuple
-            (valid_records, validation_failures)
+        Returns the original artifact if validation succeeds.
+        Raises ValidationError otherwise.
         """
 
-        schema = self._registry.get(schema_name)
+        schema = self._schema_registry.get_schema(
+            artifact.schema,
+        )
 
-        valid_records: list[dict[str, Any]] = []
-        failures: list[str] = []
+        self._validate_fields(
+            schema,
+            artifact.properties,
+        )
 
-        for record in records:
+        return artifact
 
-            try:
-                validate_node(
-                    schema,
-                    record,
-                )
+    def _validate_fields(
+        self,
+        schema: SchemaDefinition,
+        properties: Mapping[str, Any],
+    ) -> None:
+        """
+        Validate every field defined by the schema.
+        """
 
-                valid_records.append(record)
+        for field in schema.fields:
+            self._validate_field(
+                field,
+                properties,
+            )
 
-            except ValidationError as exc:
+    def _validate_field(
+        self,
+        field: FieldDefinition,
+        properties: Mapping[str, Any],
+    ) -> None:
+        """
+        Validate a single field.
+        """
 
-                failures.append(str(exc))
+        #
+        # Required field
+        #
+        if field.required and field.name not in properties:
+            raise ValidationError(f"Missing required field '{field.name}'.")
 
-        return valid_records, failures
+        #
+        # Optional field omitted.
+        #
+        if field.name not in properties:
+            return
+
+        value = properties[field.name]
+
+        #
+        # Type validation.
+        #
+        if not isinstance(value, field.type):
+            raise ValidationError(
+                f"Field '{field.name}' " f"must be of type " f"{field.type.__name__}."
+            )
+
+        #
+        # Enum validation.
+        #
+        if field.enum_values is not None and value not in field.enum_values:
+            raise ValidationError(f"Invalid value for field " f"'{field.name}'.")
+
+        #
+        # Custom validation rule.
+        #
+        if field.validation_rule is not None and not field.validation_rule(value):
+            raise ValidationError(f"Validation failed for " f"field '{field.name}'.")

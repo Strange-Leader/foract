@@ -24,9 +24,7 @@ def validate_data(
     for field in schema.fields:
 
         if field.required and field.name not in data:
-            raise ValidationError(
-                f"Missing required field: '{field.name}'."
-            )
+            raise ValidationError(f"Missing required field: '{field.name}'.")
 
         if field.name not in data:
             continue
@@ -45,28 +43,17 @@ def validate_data(
                 f"got {type(value).__name__}."
             )
 
-        if (
-            field.enum_values is not None
-            and value not in field.enum_values
-        ):
+        if field.enum_values is not None and value not in field.enum_values:
             raise ValidationError(
-                f"Field '{field.name}' must be one of "
-                f"{field.enum_values}."
+                f"Field '{field.name}' must be one of " f"{field.enum_values}."
             )
 
-        if (
-            field.validation_rule is not None
-            and not field.validation_rule(value)
-        ):
-            raise ValidationError(
-                f"Validation failed for field '{field.name}'."
-            )
+        if field.validation_rule is not None and not field.validation_rule(value):
+            raise ValidationError(f"Validation failed for field '{field.name}'.")
 
     for field in schema.identity_fields:
 
         if field.name not in data:
-            raise ValidationError(
-                f"Missing identity field: '{field.name}'."
-            )
+            raise ValidationError(f"Missing identity field: '{field.name}'.")
 
     return True

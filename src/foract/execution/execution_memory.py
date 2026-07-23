@@ -1,126 +1,156 @@
 from __future__ import annotations
 
+from collections import defaultdict
+from uuid import UUID
+
+from foract.enums.artifact import ArtifactType
 from foract.exceptions.execution import (
-    DuplicateExecutionError,
-    ExecutionNotFoundError,
+    ArtifactNotFoundError,
+    DuplicateArtifactError,
+    InvalidArtifactTypeError,
 )
-from foract.execution.execution_record import ExecutionRecord
-from foract.integration.report import IntegrationReport, IntegrationStatus
+from foract.models.execution_record import ExecutionRecord
+from foract.models.execution_report import ExecutionReport
+from foract.models.operational_artifact import OperationalArtifact
 from foract.storage.blob_store import BlobStore
 
 
 class ExecutionMemory:
     """
-    Append-only repository of completed execution records.
+    Append-only repository for immutable operational artifacts.
     """
 
-    def __init__(self, blob_store: BlobStore) -> None:
-        self._blob_store = blob_store
-        self._records: dict[str, ExecutionRecord] = {}
-        self._reports: dict[str, IntegrationReport] = {}
-
-    def append_execution(self, record: ExecutionRecord) -> None:
-        """
-        Append a completed execution record.
-
-        Raises:
-            DuplicateExecutionError:
-                If the execution ID already exists.
-        """
-        if record.execution_id in self._records:
-            raise DuplicateExecutionError(
-                f"Execution '{record.execution_id}' already exists."
-            )
-
-        self._records[record.execution_id] = record
-
-    def get_execution(self, execution_id: str) -> ExecutionRecord:
-        """
-        Retrieve an execution by ID.
-
-        Raises:
-            ExecutionNotFoundError:
-                If the execution does not exist.
-        """
-        try:
-            return self._records[execution_id]
-        except KeyError as exc:
-            raise ExecutionNotFoundError(
-                f"Execution '{execution_id}' not found."
-            ) from exc
-
-    def list_executions(self) -> list[ExecutionRecord]:
-        """
-        Return all execution records.
-        """
-        return list(self._records.values())
-
-    def find_executions_by_plugin(
+    def __init__(
         self,
-        plugin_id: str,
-    ) -> list[ExecutionRecord]:
+        blob_store: BlobStore,
+    ) -> None:
+
+        self._blob_store = blob_store
+
+        self._artifacts: dict[
+            UUID,
+            OperationalArtifact,
+        ] = {}
+
+        self._type_index: dict[
+            ArtifactType,
+            set[UUID],
+        ] = defaultdict(set)
+
+        self._investigation_index: dict[
+            UUID,
+            set[UUID],
+        ] = defaultdict(set)
+
+        self._batch_index: dict[
+            UUID,
+            set[UUID],
+        ] = defaultdict(set)
+
+    def store_artifact(
+        self,
+        artifact: OperationalArtifact,
+    ) -> None:
+
+        if artifact.id in self._artifacts:
+            raise DuplicateArtifactError(f"Artifact '{artifact.id}' already exists.")
+
+        self._artifacts[artifact.id] = artifact
+
+        self._type_index[artifact.artifact_type].add(artifact.id)
+
+        self._investigation_index[artifact.investigation_id].add(artifact.id)
+
+        if isinstance(
+            artifact,
+            (
+                ExecutionRecord,
+                ExecutionReport,
+            ),
+        ):
+            self._batch_index[artifact.batch_id].add(artifact.id)
+
+    def get_artifact(
+        self,
+        artifact_id: UUID,
+    ) -> OperationalArtifact:
+
+        try:
+            return self._artifacts[artifact_id]
+
+        except KeyError as exc:
+            raise ArtifactNotFoundError(f"Artifact '{artifact_id}' not found.") from exc
+
+    def get_artifacts(
+        self,
+    ) -> list[OperationalArtifact]:
+
+        return list(self._artifacts.values())
+
+    def get_artifacts_by_type(
+        self,
+        artifact_type: ArtifactType,
+    ) -> list[OperationalArtifact]:
         """
-        Return all executions produced by a plugin.
+        Return all artifacts of the requested type.
         """
+
         return [
-            record for record in self._records.values() if record.plugin_id == plugin_id
+            self._artifacts[artifact_id]
+            for artifact_id in self._type_index[artifact_type]
         ]
 
-    def get_stdout(self, execution_id: str) -> bytes:
-        """
-        Retrieve stdout for an execution.
-        """
-        record = self.get_execution(execution_id)
-        return self._blob_store.retrieve(record.stdout_blob_id)
-
-    def get_stderr(self, execution_id: str) -> bytes:
-        """
-        Retrieve stderr for an execution.
-        """
-        record = self.get_execution(execution_id)
-        return self._blob_store.retrieve(record.stderr_blob_id)
-
-    def attach_integration_report(
+    def get_artifacts_by_investigation(
         self,
-        report: IntegrationReport,
-    ) -> None:
+        investigation_id: UUID,
+    ) -> list[OperationalArtifact]:
         """
-        Store the IntegrationReport for an execution.
+        Return all artifacts belonging to an investigation.
         """
 
-        self._reports[report.execution_id] = report
+        return [
+            self._artifacts[artifact_id]
+            for artifact_id in self._investigation_index[investigation_id]
+        ]
 
-    def get_integration_report(
+    def get_artifacts_by_batch(
         self,
-        execution_id: str,
-    ) -> IntegrationReport:
+        batch_id: UUID,
+    ) -> list[OperationalArtifact]:
         """
-        Retrieve the IntegrationReport for an execution.
+        Return all artifacts belonging to an execution batch.
         """
 
-        try:
-            return self._reports[execution_id]
+        return [
+            self._artifacts[artifact_id] for artifact_id in self._batch_index[batch_id]
+        ]
 
-        except KeyError as exc:
-            raise ExecutionNotFoundError(
-                f"Integration report for " f"'{execution_id}' not found."
-            ) from exc
-
-    def find_executions_by_integration_status(
+    def get_stdout(
         self,
-        status: IntegrationStatus,
-    ) -> list[ExecutionRecord]:
-        """
-        Return executions having the requested
-        integration status.
-        """
+        execution_id: UUID,
+    ) -> bytes:
 
-        records: list[ExecutionRecord] = []
+        artifact = self.get_artifact(execution_id)
 
-        for execution_id, report in self._reports.items():
+        if not isinstance(
+            artifact,
+            ExecutionRecord,
+        ):
+            raise InvalidArtifactTypeError("Artifact is not an ExecutionRecord.")
 
-            if report.status == status:
+        return self._blob_store.retrieve(artifact.stdout_blob_id)
 
-                records.append(self.get_execution(execution_id))
+    def get_stderr(
+        self,
+        execution_id: UUID,
+    ) -> bytes:
 
-        return records
+        artifact = self.get_artifact(execution_id)
+
+        if not isinstance(
+            artifact,
+            ExecutionRecord,
+        ):
+            raise InvalidArtifactTypeError("Artifact is not an ExecutionRecord.")
+
+        return self._blob_store.retrieve(artifact.stderr_blob_id)

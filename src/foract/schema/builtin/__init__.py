@@ -1,5 +1,6 @@
 from .entities import ENTITY_SCHEMAS
 from .operational_artifacts import OPERATIONAL_ARTIFACT_SCHEMAS
+from .relationship_mappings import BUILTIN_RELATIONSHIP_MAPPINGS
 from .relationships import BUILTIN_RELATIONSHIPS
 
 BUILTIN_SCHEMAS = (
@@ -12,4 +13,5 @@ __all__ = [
     "OPERATIONAL_ARTIFACT_SCHEMAS",
     "BUILTIN_SCHEMAS",
     "BUILTIN_RELATIONSHIPS",
+    "BUILTIN_RELATIONSHIP_MAPPINGS",
 ]

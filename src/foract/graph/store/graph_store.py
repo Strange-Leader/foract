@@ -78,3 +78,22 @@ class GraphStore(ABC):
     def incoming_edge_ids(self, node_id: UUID) -> list[UUID]:
         """Return incoming edge IDs."""
         raise NotImplementedError
+
+    # ==========================================================
+    # Batch Operations
+    # ==========================================================
+
+    @abstractmethod
+    def commit(
+        self,
+        nodes: list[Node],
+        edges: list[Edge],
+    ) -> None:
+        """
+        Atomically store a batch of nodes and edges.
+
+        Implementations must validate the entire batch before
+        performing any writes. If validation fails, the graph
+        must remain unchanged.
+        """
+        raise NotImplementedError

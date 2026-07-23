@@ -21,10 +21,14 @@ PART_OF_INVESTIGATION = RelationshipDefinition(
     name="PART_OF_INVESTIGATION",
     description="Evidence or hypothesis belongs to an investigation.",
 )
-
+PARENT_OF = RelationshipDefinition(
+    name="PARENT_OF",
+    description="Parent process relationship.",
+)
 BUILTIN_RELATIONSHIPS = (
     SUPPORTS,
     CONTRADICTS,
     GENERATED_FROM,
     PART_OF_INVESTIGATION,
+    PARENT_OF,
 )

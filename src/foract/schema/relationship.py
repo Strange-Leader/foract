@@ -13,6 +13,7 @@ class RelationshipDefinition(BaseModel):
     They do not define graph behavior, cardinality,
     integrity constraints, or runtime validation.
     """
+
     name: str
 
     description: str = ""

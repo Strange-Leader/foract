@@ -8,27 +8,38 @@ Expected input format:
 from __future__ import annotations
 
 import json
-from typing import Any
 
-from .base import Parser
+from foract.integration.models import (
+    ArtifactSource,
+    ParsedArtifact,
+)
+from foract.integration.parser import Parser
 
 
 class WindowsPsListParser(Parser):
     """
-    Parses JSON output produced by Volatility's windows.pslist plugin.
+    Parses JSON output produced by Volatility's
+    windows.pslist plugin.
     """
 
     def parse(
         self,
-        raw: bytes,
-    ) -> list[dict[str, Any]]:
+        raw_output: bytes,
+        source: ArtifactSource,
+    ) -> list[ParsedArtifact]:
         """
-        Parse raw JSON bytes into a list of dictionaries.
+        Parse raw JSON into ParsedArtifact objects.
         """
 
         try:
-            data = json.loads(raw.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            data = json.loads(
+                raw_output.decode("utf-8"),
+            )
+
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+        ) as exc:
             raise ValueError("Invalid windows.pslist JSON output.") from exc
 
         #
@@ -45,14 +56,21 @@ class WindowsPsListParser(Parser):
         # Validate top-level structure
         #
         if not isinstance(data, list):
-            raise ValueError("windows.pslist JSON output must be a list of records.")
+            raise ValueError("windows.pslist JSON output must be a list.")
 
-        #
-        # Validate records
-        #
+        artifacts: list[ParsedArtifact] = []
+
         for record in data:
 
             if not isinstance(record, dict):
                 raise ValueError("Each windows.pslist record must be a dictionary.")
 
-        return data
+            artifacts.append(
+                ParsedArtifact(
+                    schema="Process",
+                    properties=record,
+                    source=source,
+                )
+            )
+
+        return artifacts

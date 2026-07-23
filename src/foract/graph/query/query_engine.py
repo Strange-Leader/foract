@@ -32,11 +32,7 @@ class GraphQueryEngine:
         Return all nodes belonging to the specified schema.
         """
 
-        return [
-            node
-            for node in self._store.list_nodes()
-            if node.schema == schema
-        ]
+        return [node for node in self._store.list_nodes() if node.schema == schema]
 
     def find_by_property(
         self,
@@ -81,10 +77,7 @@ class GraphQueryEngine:
                 if edge is None:
                     continue
 
-                if (
-                    relationship is not None
-                    and edge.relationship != relationship
-                ):
+                if relationship is not None and edge.relationship != relationship:
                     continue
 
                 node = self._store.get_node(edge.target)
@@ -99,10 +92,7 @@ class GraphQueryEngine:
                 if edge is None:
                     continue
 
-                if (
-                    relationship is not None
-                    and edge.relationship != relationship
-                ):
+                if relationship is not None and edge.relationship != relationship:
                     continue
 
                 node = self._store.get_node(edge.source)

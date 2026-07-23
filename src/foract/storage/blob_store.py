@@ -1,31 +1,51 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from uuid import UUID
 
 
 class BlobStore(ABC):
     """
-    Abstract storage for immutable binary blobs.
+    Abstract append-only storage for immutable binary blobs.
+
+    BlobStore stores large binary outputs produced during execution
+    (for example stdout and stderr).
+
+    Invariants
+    ----------
+    - Blob IDs are globally unique.
+    - Blob contents are immutable once stored.
+    - Existing blobs can never be overwritten.
+    - Blobs can never be deleted.
     """
 
     @abstractmethod
-    def store(self, blob_id: str, data: bytes) -> None:
+    def store(
+        self,
+        blob_id: UUID,
+        data: bytes,
+    ) -> None:
         """
-        Store a blob.
+        Store a new immutable blob.
 
-        Raises:
-            ValueError:
-                If the blob_id already exists.
+        Raises
+        ------
+        DuplicateBlobError
+            If the blob already exists.
         """
         raise NotImplementedError
 
     @abstractmethod
-    def retrieve(self, blob_id: str) -> bytes:
+    def retrieve(
+        self,
+        blob_id: UUID,
+    ) -> bytes:
         """
         Retrieve a previously stored blob.
 
-        Raises:
-            KeyError:
-                If the blob does not exist.
+        Raises
+        ------
+        BlobNotFoundError
+            If the blob does not exist.
         """
         raise NotImplementedError

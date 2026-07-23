@@ -37,9 +37,7 @@ class MemoryGraphStore(GraphStore):
 
     def add_node(self, node: Node) -> None:
         if node.id in self._nodes:
-            raise DuplicateNodeError(
-                f"Node '{node.id}' already exists."
-            )
+            raise DuplicateNodeError(f"Node '{node.id}' already exists.")
 
         self._nodes[node.id] = node
 
@@ -51,17 +49,13 @@ class MemoryGraphStore(GraphStore):
 
     def update_node(self, node: Node) -> None:
         if node.id not in self._nodes:
-            raise NodeNotFoundError(
-                f"Node '{node.id}' does not exist."
-            )
+            raise NodeNotFoundError(f"Node '{node.id}' does not exist.")
 
         self._nodes[node.id] = node
 
     def remove_node(self, node_id: UUID) -> None:
         if node_id not in self._nodes:
-            raise NodeNotFoundError(
-                f"Node '{node_id}' does not exist."
-            )
+            raise NodeNotFoundError(f"Node '{node_id}' does not exist.")
 
         #
         # Remove outgoing edges
@@ -89,19 +83,13 @@ class MemoryGraphStore(GraphStore):
 
     def add_edge(self, edge: Edge) -> None:
         if edge.id in self._edges:
-            raise DuplicateEdgeError(
-                f"Edge '{edge.id}' already exists."
-            )
+            raise DuplicateEdgeError(f"Edge '{edge.id}' already exists.")
 
         if edge.source not in self._nodes:
-            raise NodeNotFoundError(
-                f"Source node '{edge.source}' does not exist."
-            )
+            raise NodeNotFoundError(f"Source node '{edge.source}' does not exist.")
 
         if edge.target not in self._nodes:
-            raise NodeNotFoundError(
-                f"Target node '{edge.target}' does not exist."
-            )
+            raise NodeNotFoundError(f"Target node '{edge.target}' does not exist.")
 
         self._edges[edge.id] = edge
 
@@ -113,9 +101,7 @@ class MemoryGraphStore(GraphStore):
 
     def remove_edge(self, edge_id: UUID) -> None:
         if edge_id not in self._edges:
-            raise EdgeNotFoundError(
-                f"Edge '{edge_id}' does not exist."
-            )
+            raise EdgeNotFoundError(f"Edge '{edge_id}' does not exist.")
 
         edge = self._edges[edge_id]
 
@@ -138,3 +124,68 @@ class MemoryGraphStore(GraphStore):
         node_id: UUID,
     ) -> list[UUID]:
         return list(self._incoming.get(node_id, set()))
+
+    # ==========================================================
+    # Batch Operations
+    # ==========================================================
+
+    def commit(
+        self,
+        nodes: list[Node],
+        edges: list[Edge],
+    ) -> None:
+        """
+        Atomically commit a batch of nodes and edges.
+
+        The entire batch is validated before any modifications
+        are made to the graph.
+        """
+
+        #
+        # Validate node IDs
+        #
+        batch_node_ids = {node.id for node in nodes}
+
+        if len(batch_node_ids) != len(nodes):
+            raise DuplicateNodeError("Duplicate node IDs found in commit batch.")
+
+        for node in nodes:
+            if node.id in self._nodes:
+                raise DuplicateNodeError(f"Node '{node.id}' already exists.")
+
+        #
+        # Validate edge IDs
+        #
+        batch_edge_ids = {edge.id for edge in edges}
+
+        if len(batch_edge_ids) != len(edges):
+            raise DuplicateEdgeError("Duplicate edge IDs found in commit batch.")
+
+        for edge in edges:
+            if edge.id in self._edges:
+                raise DuplicateEdgeError(f"Edge '{edge.id}' already exists.")
+
+        #
+        # Validate edge endpoints.
+        #
+        available_nodes = set(self._nodes.keys()) | batch_node_ids
+
+        for edge in edges:
+            if edge.source not in available_nodes:
+                raise NodeNotFoundError(f"Source node '{edge.source}' does not exist.")
+
+            if edge.target not in available_nodes:
+                raise NodeNotFoundError(f"Target node '{edge.target}' does not exist.")
+
+        #
+        # Validation complete.
+        # Commit nodes first.
+        #
+        for node in nodes:
+            self.add_node(node)
+
+        #
+        # Commit edges.
+        #
+        for edge in edges:
+            self.add_edge(edge)

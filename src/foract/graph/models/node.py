@@ -27,5 +27,5 @@ class Node(BaseModel):
     properties: dict[str, Any] = Field(default_factory=dict)
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC)
+        default_factory=lambda: datetime.now(UTC),
     )
